@@ -122,3 +122,5 @@ const MAX_FILE_SIZE: usize = 50 * 1024 * 1024; // 50 MB limit
 
 **Al Aqmar Tinwala** — eSAMz AI · revive-me · CiboCocinar  
 Rust backend · Zero cloud · Privacy-first
+## License
+MIT
