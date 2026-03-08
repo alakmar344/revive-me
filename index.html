@@ -1,0 +1,692 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>revive-me · Legacy Data Bridge</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link href="https://fonts.googleapis.com/css2?family=Space+Mono:ital,wght@0,400;0,700;1,400&family=Syne:wght@400;700;800&display=swap" rel="stylesheet" />
+  <style>
+    /* ── Reset & Base ─────────────────────────────────────────────── */
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    :root {
+      --bg:       #0a0a0c;
+      --surface:  #111116;
+      --border:   #1e1e28;
+      --accent:   #e8ff47;
+      --accent2:  #47ffe8;
+      --muted:    #3a3a4a;
+      --text:     #d4d4e8;
+      --dim:      #666680;
+      --danger:   #ff4747;
+      --success:  #47ff8a;
+      --mono:     'Space Mono', monospace;
+      --display:  'Syne', sans-serif;
+      --radius:   6px;
+    }
+
+    html { font-size: 16px; }
+
+    body {
+      background: var(--bg);
+      color: var(--text);
+      font-family: var(--mono);
+      min-height: 100vh;
+      overflow-x: hidden;
+    }
+
+    /* ── Noise overlay ────────────────────────────────────────────── */
+    body::before {
+      content: '';
+      position: fixed; inset: 0;
+      background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noise'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noise)' opacity='0.04'/%3E%3C/svg%3E");
+      pointer-events: none; z-index: 0; opacity: .5;
+    }
+
+    /* ── Grid lines ───────────────────────────────────────────────── */
+    body::after {
+      content: '';
+      position: fixed; inset: 0;
+      background-image:
+        linear-gradient(var(--border) 1px, transparent 1px),
+        linear-gradient(90deg, var(--border) 1px, transparent 1px);
+      background-size: 40px 40px;
+      pointer-events: none; z-index: 0; opacity: .4;
+    }
+
+    /* ── Layout ───────────────────────────────────────────────────── */
+    .wrapper {
+      position: relative; z-index: 1;
+      max-width: 900px;
+      margin: 0 auto;
+      padding: 2rem 1.5rem 6rem;
+    }
+
+    /* ── Header ───────────────────────────────────────────────────── */
+    header {
+      display: flex;
+      align-items: flex-start;
+      justify-content: space-between;
+      gap: 1rem;
+      padding: 2rem 0 2.5rem;
+      border-bottom: 1px solid var(--border);
+      margin-bottom: 3rem;
+    }
+
+    .logo-block { display: flex; flex-direction: column; gap: .3rem; }
+
+    .logo {
+      font-family: var(--display);
+      font-size: clamp(1.8rem, 5vw, 3rem);
+      font-weight: 800;
+      color: #fff;
+      letter-spacing: -1px;
+      line-height: 1;
+    }
+
+    .logo span { color: var(--accent); }
+
+    .tagline {
+      font-size: .7rem;
+      color: var(--dim);
+      letter-spacing: .15em;
+      text-transform: uppercase;
+    }
+
+    .version-badge {
+      background: var(--border);
+      border: 1px solid var(--muted);
+      border-radius: var(--radius);
+      padding: .3rem .6rem;
+      font-size: .65rem;
+      color: var(--accent);
+      letter-spacing: .1em;
+      text-transform: uppercase;
+      white-space: nowrap;
+      align-self: flex-start;
+    }
+
+    /* ── Drop Zone ────────────────────────────────────────────────── */
+    .drop-zone {
+      border: 2px dashed var(--muted);
+      border-radius: 12px;
+      padding: 3.5rem 2rem;
+      text-align: center;
+      cursor: pointer;
+      transition: border-color .2s, background .2s, transform .15s;
+      background: var(--surface);
+      position: relative;
+      overflow: hidden;
+    }
+
+    .drop-zone::before {
+      content: '';
+      position: absolute; inset: 0;
+      background: radial-gradient(ellipse at 50% 0%, rgba(232,255,71,.06) 0%, transparent 70%);
+      pointer-events: none;
+    }
+
+    .drop-zone:hover,
+    .drop-zone.drag-over {
+      border-color: var(--accent);
+      background: #111a02;
+      transform: translateY(-2px);
+    }
+
+    .drop-zone.drag-over { border-style: solid; }
+
+    .drop-icon {
+      font-size: 3rem;
+      margin-bottom: 1rem;
+      display: block;
+      animation: float 3s ease-in-out infinite;
+    }
+
+    @keyframes float {
+      0%, 100% { transform: translateY(0); }
+      50% { transform: translateY(-8px); }
+    }
+
+    .drop-title {
+      font-family: var(--display);
+      font-size: 1.3rem;
+      font-weight: 700;
+      color: #fff;
+      margin-bottom: .5rem;
+    }
+
+    .drop-sub {
+      font-size: .75rem;
+      color: var(--dim);
+      margin-bottom: 1.5rem;
+      line-height: 1.6;
+    }
+
+    .file-badges {
+      display: flex;
+      gap: .5rem;
+      justify-content: center;
+      flex-wrap: wrap;
+    }
+
+    .badge {
+      background: var(--bg);
+      border: 1px solid var(--border);
+      border-radius: 4px;
+      padding: .2rem .5rem;
+      font-size: .65rem;
+      color: var(--accent2);
+      letter-spacing: .1em;
+      font-weight: 700;
+    }
+
+    #file-input { display: none; }
+
+    .browse-btn {
+      display: inline-block;
+      margin-top: 1.5rem;
+      padding: .6rem 1.4rem;
+      background: var(--accent);
+      color: #000;
+      font-family: var(--mono);
+      font-weight: 700;
+      font-size: .8rem;
+      border-radius: var(--radius);
+      border: none;
+      cursor: pointer;
+      letter-spacing: .05em;
+      transition: opacity .15s, transform .1s;
+    }
+
+    .browse-btn:hover { opacity: .85; transform: scale(1.02); }
+
+    /* ── Progress ─────────────────────────────────────────────────── */
+    .progress-wrap {
+      margin-top: 2rem;
+      display: none;
+    }
+
+    .progress-wrap.visible { display: block; }
+
+    .progress-label {
+      font-size: .7rem;
+      color: var(--dim);
+      letter-spacing: .1em;
+      margin-bottom: .4rem;
+      display: flex;
+      justify-content: space-between;
+    }
+
+    .progress-bar-outer {
+      height: 4px;
+      background: var(--border);
+      border-radius: 99px;
+      overflow: hidden;
+    }
+
+    .progress-bar-inner {
+      height: 100%;
+      background: var(--accent);
+      border-radius: 99px;
+      width: 0%;
+      transition: width .4s ease;
+    }
+
+    .progress-bar-inner.indeterminate {
+      width: 40%;
+      animation: slide 1.2s ease-in-out infinite;
+    }
+
+    @keyframes slide {
+      0% { transform: translateX(-100%); }
+      100% { transform: translateX(350%); }
+    }
+
+    /* ── Result Card ──────────────────────────────────────────────── */
+    .result-card {
+      margin-top: 2.5rem;
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: 1.8rem;
+      display: none;
+      animation: slideUp .3s ease;
+    }
+
+    .result-card.visible { display: block; }
+
+    @keyframes slideUp {
+      from { opacity: 0; transform: translateY(12px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+
+    .result-header {
+      display: flex;
+      align-items: center;
+      gap: .8rem;
+      margin-bottom: 1.5rem;
+      padding-bottom: 1rem;
+      border-bottom: 1px solid var(--border);
+    }
+
+    .status-dot {
+      width: 10px; height: 10px;
+      border-radius: 50%;
+      background: var(--success);
+      box-shadow: 0 0 8px var(--success);
+      flex-shrink: 0;
+    }
+
+    .status-dot.error { background: var(--danger); box-shadow: 0 0 8px var(--danger); }
+
+    .result-title {
+      font-family: var(--display);
+      font-size: 1rem;
+      font-weight: 700;
+      color: #fff;
+    }
+
+    .stats-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(130px, 1fr));
+      gap: 1rem;
+      margin-bottom: 1.5rem;
+    }
+
+    .stat-box {
+      background: var(--bg);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: .9rem 1rem;
+    }
+
+    .stat-label {
+      font-size: .6rem;
+      color: var(--dim);
+      letter-spacing: .12em;
+      text-transform: uppercase;
+      margin-bottom: .3rem;
+    }
+
+    .stat-value {
+      font-family: var(--display);
+      font-size: 1.4rem;
+      font-weight: 800;
+      color: var(--accent);
+    }
+
+    .stat-value.small { font-size: 1rem; color: var(--text); }
+
+    .download-row {
+      display: flex;
+      gap: .8rem;
+      flex-wrap: wrap;
+    }
+
+    .dl-btn {
+      flex: 1;
+      min-width: 140px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: .5rem;
+      padding: .75rem 1rem;
+      border-radius: var(--radius);
+      font-family: var(--mono);
+      font-size: .75rem;
+      font-weight: 700;
+      cursor: pointer;
+      text-decoration: none;
+      transition: opacity .15s, transform .1s;
+      border: none;
+    }
+
+    .dl-btn:hover { opacity: .85; transform: translateY(-1px); }
+
+    .dl-btn.xlsx {
+      background: var(--accent);
+      color: #000;
+    }
+
+    .dl-btn.json {
+      background: transparent;
+      color: var(--accent2);
+      border: 1px solid var(--accent2);
+    }
+
+    /* ── Error State ──────────────────────────────────────────────── */
+    .error-card {
+      margin-top: 2rem;
+      background: rgba(255,71,71,.08);
+      border: 1px solid rgba(255,71,71,.3);
+      border-radius: var(--radius);
+      padding: 1rem 1.2rem;
+      font-size: .8rem;
+      color: var(--danger);
+      display: none;
+    }
+
+    .error-card.visible { display: block; animation: slideUp .25s ease; }
+
+    /* ── History Table ─────────────────────────────────────────────── */
+    .history-section {
+      margin-top: 3.5rem;
+    }
+
+    .section-title {
+      font-family: var(--display);
+      font-size: .85rem;
+      font-weight: 700;
+      color: var(--dim);
+      letter-spacing: .15em;
+      text-transform: uppercase;
+      margin-bottom: 1rem;
+      display: flex;
+      align-items: center;
+      gap: .6rem;
+    }
+
+    .section-title::after {
+      content: '';
+      flex: 1;
+      height: 1px;
+      background: var(--border);
+    }
+
+    .history-list { display: flex; flex-direction: column; gap: .5rem; }
+
+    .history-item {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: .7rem 1rem;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 1rem;
+      font-size: .72rem;
+      animation: slideUp .2s ease;
+    }
+
+    .history-item .h-name { color: #fff; font-weight: 700; flex: 1; }
+    .history-item .h-meta { color: var(--dim); white-space: nowrap; }
+
+    .history-dl {
+      display: flex;
+      gap: .4rem;
+    }
+
+    .history-dl a {
+      padding: .25rem .5rem;
+      border-radius: 4px;
+      font-size: .62rem;
+      font-family: var(--mono);
+      font-weight: 700;
+      cursor: pointer;
+      text-decoration: none;
+    }
+
+    .history-dl a.x { background: var(--accent); color: #000; }
+    .history-dl a.j { background: transparent; border: 1px solid var(--muted); color: var(--accent2); }
+
+    .no-history { font-size: .75rem; color: var(--muted); font-style: italic; }
+
+    /* ── Footer ───────────────────────────────────────────────────── */
+    footer {
+      margin-top: 4rem;
+      padding-top: 1.5rem;
+      border-top: 1px solid var(--border);
+      font-size: .65rem;
+      color: var(--muted);
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      gap: 1rem;
+      flex-wrap: wrap;
+    }
+
+    footer .rust-badge {
+      display: flex;
+      align-items: center;
+      gap: .3rem;
+      color: #f74c00;
+      font-weight: 700;
+    }
+
+    /* ── Responsive ───────────────────────────────────────────────── */
+    @media (max-width: 600px) {
+      header { flex-direction: column; }
+      .stats-grid { grid-template-columns: 1fr 1fr; }
+    }
+  </style>
+</head>
+<body>
+  <div class="wrapper">
+
+    <!-- ── Header ── -->
+    <header>
+      <div class="logo-block">
+        <div class="logo">revive<span>-me</span></div>
+        <div class="tagline">Legacy Data Bridge · FoxPro / dBase / Old Excel → Modern Formats</div>
+      </div>
+      <div class="version-badge">v1.0.0 · Rust</div>
+    </header>
+
+    <!-- ── Drop Zone ── -->
+    <div class="drop-zone" id="dropZone">
+      <span class="drop-icon">📦</span>
+      <div class="drop-title">Drop your legacy file here</div>
+      <div class="drop-sub">
+        Supports FoxPro, dBase III/IV, old Excel, CSV, TSV<br/>
+        Up to 50 MB · Data never leaves your server
+      </div>
+      <div class="file-badges">
+        <span class="badge">.DBF</span>
+        <span class="badge">.XLS</span>
+        <span class="badge">.XLSX</span>
+        <span class="badge">.CSV</span>
+        <span class="badge">.TSV</span>
+      </div>
+      <button class="browse-btn" onclick="document.getElementById('file-input').click()">
+        Browse File
+      </button>
+      <input type="file" id="file-input" accept=".dbf,.xls,.xlsx,.csv,.tsv" />
+    </div>
+
+    <!-- ── Progress ── -->
+    <div class="progress-wrap" id="progressWrap">
+      <div class="progress-label">
+        <span id="progressLabel">Reading file…</span>
+        <span id="progressPct"></span>
+      </div>
+      <div class="progress-bar-outer">
+        <div class="progress-bar-inner indeterminate" id="progressBar"></div>
+      </div>
+    </div>
+
+    <!-- ── Error ── -->
+    <div class="error-card" id="errorCard"></div>
+
+    <!-- ── Result ── -->
+    <div class="result-card" id="resultCard">
+      <div class="result-header">
+        <div class="status-dot" id="statusDot"></div>
+        <div class="result-title" id="resultTitle"></div>
+      </div>
+      <div class="stats-grid" id="statsGrid"></div>
+      <div class="download-row" id="downloadRow"></div>
+    </div>
+
+    <!-- ── History ── -->
+    <div class="history-section">
+      <div class="section-title">Conversion History</div>
+      <div class="history-list" id="historyList">
+        <div class="no-history">No conversions yet this session.</div>
+      </div>
+    </div>
+
+    <footer>
+      <span>revive-me · Built by Al Aqmar Tinwala</span>
+      <span class="rust-badge">⚙ Powered by Rust + Actix-Web</span>
+    </footer>
+
+  </div>
+
+  <script>
+    // ── State ──────────────────────────────────────────────────────────────────
+    const history = [];
+
+    // ── DOM refs ───────────────────────────────────────────────────────────────
+    const dropZone     = document.getElementById('dropZone');
+    const fileInput    = document.getElementById('file-input');
+    const progressWrap = document.getElementById('progressWrap');
+    const progressBar  = document.getElementById('progressBar');
+    const progressLabel= document.getElementById('progressLabel');
+    const resultCard   = document.getElementById('resultCard');
+    const errorCard    = document.getElementById('errorCard');
+    const statusDot    = document.getElementById('statusDot');
+    const resultTitle  = document.getElementById('resultTitle');
+    const statsGrid    = document.getElementById('statsGrid');
+    const downloadRow  = document.getElementById('downloadRow');
+    const historyList  = document.getElementById('historyList');
+
+    // ── Drag & Drop ───────────────────────────────────────────────────────────
+    ['dragenter','dragover'].forEach(evt =>
+      dropZone.addEventListener(evt, e => { e.preventDefault(); dropZone.classList.add('drag-over'); })
+    );
+    ['dragleave','drop'].forEach(evt =>
+      dropZone.addEventListener(evt, e => { e.preventDefault(); dropZone.classList.remove('drag-over'); })
+    );
+    dropZone.addEventListener('drop', e => {
+      const file = e.dataTransfer.files[0];
+      if (file) processFile(file);
+    });
+    dropZone.addEventListener('click', e => {
+      if (e.target.tagName !== 'BUTTON') fileInput.click();
+    });
+    fileInput.addEventListener('change', () => {
+      if (fileInput.files[0]) processFile(fileInput.files[0]);
+    });
+
+    // ── UI helpers ────────────────────────────────────────────────────────────
+    function showProgress(label) {
+      progressWrap.classList.add('visible');
+      progressBar.classList.add('indeterminate');
+      progressLabel.textContent = label || 'Processing…';
+      resultCard.classList.remove('visible');
+      errorCard.classList.remove('visible');
+    }
+
+    function hideProgress() {
+      progressWrap.classList.remove('visible');
+    }
+
+    function showError(msg) {
+      hideProgress();
+      errorCard.textContent = '⚠ ' + msg;
+      errorCard.classList.add('visible');
+    }
+
+    function showResult(record) {
+      hideProgress();
+      errorCard.classList.remove('visible');
+
+      statusDot.className = 'status-dot';
+      resultTitle.textContent = `✓ ${record.original_name} converted successfully`;
+
+      // Stats
+      statsGrid.innerHTML = `
+        ${stat('Rows', record.rows.toLocaleString())}
+        ${stat('Columns', record.columns)}
+        ${stat('Duplicates removed', record.duplicates_removed)}
+        ${stat('Source format', record.file_type.toUpperCase(), true)}
+      `;
+
+      // Downloads
+      downloadRow.innerHTML = `
+        <a class="dl-btn xlsx" href="/api/download/${record.output_xlsx}" download>
+          📥 Download .xlsx
+        </a>
+        <a class="dl-btn json" href="/api/download/${record.output_json}" download>
+          { } Download .json
+        </a>
+      `;
+
+      resultCard.classList.add('visible');
+      addHistory(record);
+    }
+
+    function stat(label, value, small = false) {
+      return `<div class="stat-box">
+        <div class="stat-label">${label}</div>
+        <div class="stat-value${small ? ' small' : ''}">${value}</div>
+      </div>`;
+    }
+
+    // ── History ───────────────────────────────────────────────────────────────
+    function addHistory(record) {
+      history.unshift(record);
+      renderHistory();
+    }
+
+    function renderHistory() {
+      if (history.length === 0) {
+        historyList.innerHTML = '<div class="no-history">No conversions yet this session.</div>';
+        return;
+      }
+      historyList.innerHTML = history.map(r => `
+        <div class="history-item">
+          <span class="h-name">${escHtml(r.original_name)}</span>
+          <span class="h-meta">${r.rows} rows · ${r.columns} cols · ${r.file_type.toUpperCase()}</span>
+          <div class="history-dl">
+            <a class="x" href="/api/download/${r.output_xlsx}" download>.xlsx</a>
+            <a class="j" href="/api/download/${r.output_json}" download>.json</a>
+          </div>
+        </div>
+      `).join('');
+    }
+
+    function escHtml(str) {
+      return str.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+    }
+
+    // ── Main upload flow ──────────────────────────────────────────────────────
+    async function processFile(file) {
+      const allowed = ['.dbf','.xls','.xlsx','.csv','.tsv'];
+      const ext = '.' + file.name.split('.').pop().toLowerCase();
+      if (!allowed.includes(ext)) {
+        showError(`Unsupported file type "${ext}". Please use: ${allowed.join(', ')}`);
+        return;
+      }
+
+      showProgress(`Uploading ${file.name}…`);
+
+      const form = new FormData();
+      form.append('file', file);
+
+      try {
+        progressLabel.textContent = `Converting ${file.name}…`;
+
+        const res = await fetch('/api/upload', {
+          method: 'POST',
+          body: form,
+        });
+
+        const payload = await res.json();
+
+        if (!payload.success) {
+          showError(payload.message || 'Conversion failed');
+          return;
+        }
+
+        showResult(payload.data);
+
+      } catch (err) {
+        showError('Network error — is the revive-me server running on port 8080?');
+        console.error(err);
+      }
+    }
+  </script>
+</body>
+</html>
